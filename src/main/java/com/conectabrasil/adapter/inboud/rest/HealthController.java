@@ -1,4 +1,4 @@
-package com.conectabrasil;
+package com.conectabrasil.adapter.inboud.rest;
 
 import java.util.Map;
 
