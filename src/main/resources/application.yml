@@ -3,9 +3,9 @@ server:
 
 spring:
   application:
-    name: stay-oline-backend
+    name: conecta-brasil-backend
 
-# Configurações do Stellar/Soroban - #todo: ajustar para variavels de ambiente
+# Configurações do Stellar/Soroban - #todo: ajustar para variaveis de ambiente
 stellar:
   network-passphrase: "Test SDF Network ; September 2015"   # TESTNET
   horizon-url: "https://horizon-testnet.stellar.org"
