@@ -20,7 +20,9 @@ import org.stellar.sdk.xdr.SCVal;
 import org.stellar.sdk.xdr.SCValType;
 import org.stellar.sdk.xdr.SorobanAuthorizationEntry;
 import org.stellar.sdk.xdr.Uint32;
+import org.stellar.sdk.xdr.Uint64;
 import org.stellar.sdk.xdr.XdrDataInputStream;
+import org.stellar.sdk.xdr.XdrUnsignedHyperInteger;
 import org.stellar.sdk.xdr.XdrUnsignedInteger;
 
 
@@ -120,9 +122,94 @@ public class SorobanContractService {
         // return toSimulate.toEnvelopeXdrBase64();
     }
 
+    /**
+     * Versão de teste: monta transação para grant(caller, owner, order_id)
+     * Ajuste principal: order_id em U128 (não U32). Usa hi=0, lo=orderId.
+     */
+    public String buildGrantUnsignedXdrForTest(String callerAccountId, String ownerAccountId, long orderId)
+            throws Exception {
+        // 0) Carrega a conta fonte (caller) via Soroban RPC
+        TransactionBuilderAccount source = soroban.getAccount(callerAccountId);
+
+        // 1) Args do contrato
+        SCVal callerArg = new Address(callerAccountId).toSCVal();
+        SCVal ownerArg = new Address(ownerAccountId).toSCVal();
+        SCVal orderIdArg = u128Lo(orderId); // <<< AJUSTE: U128 (hi=0, lo=orderId)
+
+        // 2) Operação de invocação (sem auth ainda)
+        InvokeHostFunctionOperation opNoAuth = InvokeHostFunctionOperation
+                .invokeContractFunctionOperationBuilder(
+                        stellarConfig.getContractAddress(),
+                        "grant",
+                        java.util.List.of(callerArg, ownerArg, orderIdArg))
+                .build();
+
+        // 3) Simula para coletar possíveis authorizations
+        Transaction toSimulate = new TransactionBuilder(source, network)
+                .addOperation(opNoAuth)
+                .setBaseFee(100)
+                .setTimeout(120)
+                .build();
+
+        var simulation = soroban.simulateTransaction(toSimulate);
+        if (simulation.getError() != null) {
+            throw new RuntimeException("simulate error: " + simulation.getError());
+        }
+
+        // 4) Decodifica auth (se houver)
+        List<SorobanAuthorizationEntry> authorizations = Collections.emptyList();
+        if (simulation.getResults() != null && !simulation.getResults().isEmpty()
+                && simulation.getResults().get(0).getAuth() != null
+                && !simulation.getResults().get(0).getAuth().isEmpty()) {
+            authorizations = decodeAuthBase64(simulation.getResults().get(0).getAuth());
+        }
+
+        // 5) Recria operação COM auth (quando houver)
+        var opBuilder = InvokeHostFunctionOperation
+                .invokeContractFunctionOperationBuilder(
+                        stellarConfig.getContractAddress(),
+                        "grant",
+                        java.util.List.of(callerArg, ownerArg, orderIdArg));
+        if (!authorizations.isEmpty()) {
+            opBuilder.auth(authorizations);
+        }
+        var opWithAuth = opBuilder.build();
+
+        // 6) Recarrega a conta para não queimar sequence e prepara
+        source = soroban.getAccount(callerAccountId);
+        Transaction unsigned = new TransactionBuilder(source, network)
+                .addOperation(opWithAuth) // <<< usa a operação COM AUTH
+                .setBaseFee(100)
+                .setTimeout(120)
+                .build();
+
+        unsigned = soroban.prepareTransaction(unsigned);
+
+        // 7) Retorna XDR não assinado (carteira assina e envia)
+        return unsigned.toEnvelopeXdrBase64();
+    }
+
     // -------------------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------------------
+    /** Helper: cria SCVal U128 com hi=0 e lo=valor (para orderIds pequenos). */
+    private static SCVal u128Lo(long lo) {
+        // hi = 0
+        Uint64 hi = new Uint64();
+        hi.setUint64(new XdrUnsignedHyperInteger(0L));
+        // lo = valor
+        Uint64 lo64 = new Uint64();
+        lo64.setUint64(new XdrUnsignedHyperInteger(lo));
+
+        org.stellar.sdk.xdr.UInt128Parts parts = new org.stellar.sdk.xdr.UInt128Parts();
+        parts.setHi(hi);
+        parts.setLo(lo64);
+
+        SCVal v = new SCVal();
+        v.setDiscriminant(SCValType.SCV_U128);
+        v.setU128(parts);
+        return v;
+    }
 
     private static List<SorobanAuthorizationEntry> decodeAuthBase64(List<String> authB64) throws Exception {
         if (authB64 == null || authB64.isEmpty())
