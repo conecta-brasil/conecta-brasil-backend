@@ -55,7 +55,7 @@ public class SorobanContractService {
      * @param packageId      id do pacote (u32)
      * @return base64 do TransactionEnvelope (unsigned)
      */
-    public String buildBuyOrderUnsignedXdr(String ownerAccountId, int packageId) throws Exception {
+    public String buildBuyAndGrantUnsignedXdr(String ownerAccountId, int packageId) throws Exception {
         // 0) Carrega a conta no formato certo (TransactionBuilderAccount) via Soroban
         // RPC
         TransactionBuilderAccount source = soroban.getAccount(ownerAccountId); // SorobanServer
@@ -67,8 +67,8 @@ public class SorobanContractService {
 
         // 2) Operação de invocação (ajuste para usar seu helper se preferir)
         InvokeHostFunctionOperation op = InvokeHostFunctionOperation
-                .invokeContractFunctionOperationBuilder(stellarConfig.getContractAddress(), "buy_order",
-                        java.util.List.of(ownerArg, pkgArg))
+                .invokeContractFunctionOperationBuilder(stellarConfig.getContractAddress(), "buy_and_grant",
+                                java.util.List.of(ownerArg, pkgArg))
                 .build();
 
         // 3) Monta a transação (apenas UMA vez) — não assina
