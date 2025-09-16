@@ -1,0 +1,28 @@
+{
+	"info": {
+		"_postman_id": "72017c85-0efd-4e25-b6f6-d0a3e08feddc",
+		"name": "conecta_brasil_backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "1056905",
+		"_collection_link": "https://planetary-star-259387.postman.co/workspace/WEB3~b7e1d6df-6f60-4c96-ad9c-3a273e658559/collection/1056905-72017c85-0efd-4e25-b6f6-d0a3e08feddc?action=share&source=collection_link&creator=1056905"
+	},
+	"item": [
+		{
+			"name": "health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{url}}/health",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
