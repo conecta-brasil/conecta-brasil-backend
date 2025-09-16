@@ -22,7 +22,7 @@ public class CreatePurchaseUseCase {
         try {
             // Gera o XDR não assinado para o cliente assinar
             int packageIdInt = Integer.parseInt(packageId);
-            String unsignedXdr = sorobanService.buildBuyOrderUnsignedXdr(userId, packageIdInt);
+            String unsignedXdr = sorobanService.buildBuyAndGrantUnsignedXdr(userId, packageIdInt);
 
             // Cria a compra com status PENDING (aguardando assinatura)
             Purchase purchase = new Purchase(
