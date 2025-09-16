@@ -11,6 +11,7 @@ import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.stellar.sdk.Address;
+import org.stellar.sdk.KeyPair;
 import org.stellar.sdk.Network;
 import org.stellar.sdk.Server;
 import org.stellar.sdk.SorobanServer;
@@ -342,6 +343,154 @@ public class SorobanContractService {
             }
 
             return packages;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao fazer parsing do resultado SCVal: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Busca os pacotes de um usuário específico
+     * Invoca a função get_user_packages do contrato Stellar
+     * 
+     * @param userAddress Endereço Stellar do usuário
+     * @return Lista de pacotes do usuário
+     * @throws Exception se houver erro na invocação
+     */
+    public List<Object> getUserPackages(String userAddress) throws Exception {
+        try {
+            // Cria uma conta mock temporária para a simulação
+            TransactionBuilderAccount sourceAccount = new TransactionBuilderAccount() {
+                private long sequenceNumber = 0;
+                private KeyPair keyPair = KeyPair.random();
+
+                @Override
+                public KeyPair getKeyPair() {
+                    return keyPair;
+                }
+
+                @Override
+                public String getAccountId() {
+                    return keyPair.getAccountId();
+                }
+
+                @Override
+                public Long getSequenceNumber() {
+                    return sequenceNumber;
+                }
+
+                @Override
+                public Long getIncrementedSequenceNumber() {
+                    return ++sequenceNumber;
+                }
+
+                @Override
+                public void incrementSequenceNumber() {
+                    sequenceNumber++;
+                }
+
+                @Override
+                public void setSequenceNumber(long seqNum) {
+                    this.sequenceNumber = seqNum;
+                }
+            };
+
+            // Converte o endereço do usuário para Address
+            Address ownerAddress = new Address(userAddress);
+
+            // Cria os argumentos para a função get_user_packages
+            SCVal[] args = new SCVal[] {
+                    ownerAddress.toSCVal()
+            };
+
+            // Monta a operação de invocação
+            InvokeHostFunctionOperation operation = InvokeHostFunctionOperation
+                    .invokeContractFunctionOperationBuilder(
+                            stellarConfig.getContractAddress(),
+                            "get_user_packages",
+                            java.util.List.of(args))
+                    .build();
+
+            // Constrói a transação
+            Transaction transaction = new TransactionBuilder(sourceAccount, network)
+                    .addOperation(operation)
+                    .setTimeout(30)
+                    .setBaseFee(100)
+                    .build();
+
+            // Simula a transação
+            var response = soroban.simulateTransaction(transaction);
+
+            if (response.getError() != null) {
+                throw new RuntimeException("Erro na simulação: " + response.getError());
+            }
+
+            // Extrai o resultado
+            if (response.getResults() != null && !response.getResults().isEmpty()) {
+                String result = response.getResults().get(0).getXdr();
+                return parseUserPackagesFromSCVal(result);
+            }
+
+            return Collections.emptyList();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao buscar pacotes do usuário: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Faz o parsing do resultado SCVal para extrair a lista de pacotes do usuário
+     * Formato esperado: [["package_id", package_id_num, is_active]]
+     */
+    private List<Object> parseUserPackagesFromSCVal(String xdrResult) throws Exception {
+        try {
+            // Decodifica o XDR base64
+            byte[] xdrBytes = Base64.getDecoder().decode(xdrResult);
+            XdrDataInputStream xdrStream = new XdrDataInputStream(new ByteArrayInputStream(xdrBytes));
+
+            // Lê o SCVal do resultado
+            SCVal resultVal = SCVal.decode(xdrStream);
+
+            List<Object> userPackages = new ArrayList<>();
+
+            // Verifica se é um vetor (lista)
+            if (resultVal.getDiscriminant() == SCValType.SCV_VEC) {
+                SCVal[] vec = resultVal.getVec().getSCVec();
+                if (vec != null && vec.length > 0) {
+                    for (SCVal item : vec) {
+                        // Cada item deve ser um vetor [package_id_string, package_id_num, is_active]
+                        if (item.getDiscriminant() == SCValType.SCV_VEC) {
+                            SCVal[] packageVec = item.getVec().getSCVec();
+                            if (packageVec != null && packageVec.length >= 3) {
+                                Map<String, Object> packageData = new HashMap<>();
+
+                                // Primeiro elemento é o order_id como U128
+                                if (packageVec[0].getDiscriminant() == SCValType.SCV_U128) {
+                                    packageData.put("order_id",
+                                            packageVec[0].getU128().getLo().getUint64().getNumber().longValue());
+                                }
+
+                                // Segundo elemento é o package_id como número
+                                if (packageVec[1].getDiscriminant() == SCValType.SCV_U32) {
+                                    packageData.put("package_id",
+                                            packageVec[1].getU32().getUint32().getNumber().longValue());
+                                }
+
+                                // Terceiro elemento é se está ativo
+                                if (packageVec[2].getDiscriminant() == SCValType.SCV_BOOL) {
+                                    packageData.put("is_active", packageVec[2].getB());
+                                }
+
+                                if (!packageData.isEmpty()) {
+                                    userPackages.add(packageData);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return userPackages;
 
         } catch (Exception e) {
             throw new RuntimeException("Erro ao fazer parsing do resultado SCVal: " + e.getMessage(), e);
