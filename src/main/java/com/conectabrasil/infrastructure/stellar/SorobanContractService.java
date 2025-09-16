@@ -4,7 +4,9 @@ import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import org.stellar.sdk.Transaction;
 import org.stellar.sdk.TransactionBuilder;
 import org.stellar.sdk.TransactionBuilderAccount;
 import org.stellar.sdk.operations.InvokeHostFunctionOperation;
+import org.stellar.sdk.xdr.SCMapEntry;
 import org.stellar.sdk.xdr.SCVal;
 import org.stellar.sdk.xdr.SCValType;
 import org.stellar.sdk.xdr.SorobanAuthorizationEntry;
@@ -233,5 +236,156 @@ public class SorobanContractService {
         sc.setU32(u);
         return sc;
     }
+
+    /**
+     * Invoca a função get_all_packages do contrato Stellar
+     * 
+     * @return Lista de pacotes disponíveis
+     */
+    public List<Object> getAllPackages() throws Exception {
+        try {
+            // Usa uma conta válida do Stellar para simulação
+            // Para view functions, podemos usar qualquer conta válida
+            String validAccount = "GBQXJ5OUUJO4DYJ43ZT7FFU4NM4TQGBHLEN7G553WIPQMTN4LX45ZL35";
+            TransactionBuilderAccount source = soroban.getAccount(validAccount);
+
+            // Cria operação para invocar get_all_packages (sem argumentos)
+            InvokeHostFunctionOperation op = InvokeHostFunctionOperation
+                    .invokeContractFunctionOperationBuilder(
+                            stellarConfig.getContractAddress(),
+                            "get_all_packages",
+                            Collections.emptyList())
+                    .build();
+
+            // Monta transação para simulação
+            Transaction toSimulate = new TransactionBuilder(source, network)
+                    .addOperation(op)
+                    .setBaseFee(100)
+                    .setTimeout(120)
+                    .build();
+
+            // Simula a transação
+            var simulation = soroban.simulateTransaction(toSimulate);
+            if (simulation.getError() != null) {
+                throw new RuntimeException("Simulation error: " + simulation.getError());
+            }
+
+            // Extrai o resultado da simulação
+            if (simulation.getResults() != null && !simulation.getResults().isEmpty()) {
+                var result = simulation.getResults().get(0);
+                if (result.getXdr() != null) {
+                    // Faz o parsing do resultado SCVal
+                    return parsePackagesFromSCVal(result.getXdr());
+                }
+            }
+
+            return Collections.emptyList();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao buscar pacotes do contrato: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Faz o parsing do resultado SCVal para extrair a lista de pacotes
+     * Formato esperado: [[id, {duration_secs, is_popular, name, price,
+     * speed_message}]]
+     */
+    private List<Object> parsePackagesFromSCVal(String xdrResult) throws Exception {
+        try {
+            // Decodifica o XDR base64
+            byte[] xdrBytes = Base64.getDecoder().decode(xdrResult);
+            XdrDataInputStream xdrStream = new XdrDataInputStream(new ByteArrayInputStream(xdrBytes));
+
+            // Lê o SCVal do resultado
+            SCVal resultVal = SCVal.decode(xdrStream);
+
+            List<Object> packages = new ArrayList<>();
+
+            // Verifica se é um vetor (lista)
+            if (resultVal.getDiscriminant() == SCValType.SCV_VEC) {
+                SCVal[] vec = resultVal.getVec().getSCVec();
+                if (vec != null && vec.length > 0) {
+                    for (SCVal item : vec) {
+                        // Cada item deve ser um vetor [id, package_data]
+                        if (item.getDiscriminant() == SCValType.SCV_VEC) {
+                            SCVal[] packageVec = item.getVec().getSCVec();
+                            if (packageVec != null && packageVec.length >= 2) {
+                                Map<String, Object> packageData = new HashMap<>();
+
+                                // Primeiro elemento é o ID
+                                if (packageVec[0].getDiscriminant() == SCValType.SCV_U32) {
+                                    packageData.put("id", packageVec[0].getU32().getUint32().getNumber().longValue());
+                                }
+
+                                // Segundo elemento é o mapa com os dados do pacote
+                                if (packageVec[1].getDiscriminant() == SCValType.SCV_MAP) {
+                                    SCMapEntry[] map = packageVec[1].getMap().getSCMap();
+                                    if (map != null) {
+                                        for (SCMapEntry entry : map) {
+                                            String key = extractStringFromSCVal(entry.getKey());
+                                            Object value = extractValueFromSCVal(entry.getVal());
+                                            if (key != null && value != null) {
+                                                packageData.put(key, value);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (!packageData.isEmpty()) {
+                                    packages.add(packageData);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return packages;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao fazer parsing do resultado SCVal: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Extrai string de um SCVal
+     */
+    private String extractStringFromSCVal(SCVal val) {
+        if (val.getDiscriminant() == SCValType.SCV_SYMBOL) {
+            return val.getSym().getSCSymbol().toString();
+        } else if (val.getDiscriminant() == SCValType.SCV_STRING) {
+            return val.getStr().getSCString().toString();
+        }
+        return null;
+    }
+
+    /**
+     * Extrai valor de um SCVal de forma limpa
+     */
+    private Object extractValueFromSCVal(SCVal val) {
+        switch (val.getDiscriminant()) {
+            case SCV_U32:
+                return val.getU32().getUint32().getNumber().longValue();
+            case SCV_U64:
+                return val.getU64().getUint64().getNumber().longValue();
+            case SCV_I32:
+                return val.getI32().getInt32();
+            case SCV_I64:
+                return val.getI64().getInt64();
+            case SCV_I128:
+                // Para I128, extrair apenas o valor low (suficiente para preços)
+                return val.getI128().getLo().getUint64().getNumber().longValue();
+            case SCV_BOOL:
+                return val.getB();
+            case SCV_STRING:
+                return val.getStr().getSCString().toString();
+            case SCV_SYMBOL:
+                return val.getSym().getSCSymbol().toString();
+            default:
+                return null;
+        }
+    }
+
 }
 
