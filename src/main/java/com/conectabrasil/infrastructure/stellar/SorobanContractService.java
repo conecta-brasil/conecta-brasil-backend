@@ -96,7 +96,7 @@ public class SorobanContractService {
 
         // 5) Recria a operação COM auth (se houver)
         var opBuilder = InvokeHostFunctionOperation
-                .invokeContractFunctionOperationBuilder(stellarConfig.getContractAddress(), "buy_order",
+                .invokeContractFunctionOperationBuilder(stellarConfig.getContractAddress(), "buy_and_grant",
                         List.of(ownerArg, pkgArg));
 
         if (!authorizations.isEmpty()) {
@@ -579,6 +579,118 @@ public class SorobanContractService {
 
         } catch (Exception e) {
             throw new RuntimeException("Erro ao buscar valor restante da ordem: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Invoca a função start_order do contrato Stellar
+     * 
+     * @param ownerAddress Endereço do proprietário
+     * @param orderId      ID do pedido
+     * @return Resultado da operação start_order
+     */
+    public Object startOrder(String ownerAddress, long orderId) throws Exception {
+        try {
+            // Cria uma conta temporária para a transação
+            KeyPair keyPair = KeyPair.random();
+            TransactionBuilderAccount account = new TransactionBuilderAccount() {
+                private long sequenceNumber = 0L;
+
+                @Override
+                public String getAccountId() {
+                    return keyPair.getAccountId();
+                }
+
+                @Override
+                public KeyPair getKeyPair() {
+                    return keyPair;
+                }
+
+                @Override
+                public Long getSequenceNumber() {
+                    return sequenceNumber;
+                }
+
+                @Override
+                public Long getIncrementedSequenceNumber() {
+                    return sequenceNumber + 1;
+                }
+
+                @Override
+                public void incrementSequenceNumber() {
+                    sequenceNumber++;
+                }
+
+                @Override
+                public void setSequenceNumber(long sequenceNumber) {
+                    this.sequenceNumber = sequenceNumber;
+                }
+            };
+
+            // Cria os parâmetros da função
+            SCVal ownerParam = new Address(ownerAddress).toSCVal();
+            SCVal orderIdParam = u128Lo(orderId);
+
+            // Cria a operação de invocação
+            InvokeHostFunctionOperation operation = InvokeHostFunctionOperation.invokeContractFunctionOperationBuilder(
+                    stellarConfig.getContractAddress(),
+                    "start_order",
+                    java.util.Arrays.asList(ownerParam, orderIdParam)).build();
+
+            // Constrói a transação
+            Transaction transaction = new TransactionBuilder(account, network)
+                    .addOperation(operation)
+                    .setTimeout(30)
+                    .setBaseFee(100)
+                    .build();
+
+            // Simula a transação
+            org.stellar.sdk.responses.sorobanrpc.SimulateTransactionResponse response = soroban
+                    .simulateTransaction(transaction);
+
+            if (response.getError() != null) {
+                throw new RuntimeException("Erro na simulação: " + response.getError());
+            }
+
+            if (response.getResults() != null && !response.getResults().isEmpty()) {
+                String xdrResult = response.getResults().get(0).getXdr();
+                return parseStartOrderFromSCVal(xdrResult);
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao invocar start_order: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Faz o parsing do resultado SCVal para extrair o resultado do start_order
+     */
+    private Object parseStartOrderFromSCVal(String xdrResult) throws Exception {
+        try {
+            // Decodifica o XDR base64
+            byte[] xdrBytes = Base64.getDecoder().decode(xdrResult);
+            XdrDataInputStream xdrStream = new XdrDataInputStream(new ByteArrayInputStream(xdrBytes));
+
+            // Lê o SCVal do resultado
+            SCVal resultVal = SCVal.decode(xdrStream);
+
+            // Extrai o valor baseado no tipo
+            Object startOrderResult = extractValueFromSCVal(resultVal);
+
+            // Retorna um objeto JSON amigável para o frontend
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("result", startOrderResult != null ? startOrderResult : "success");
+            response.put("timestamp", System.currentTimeMillis());
+            return response;
+
+        } catch (Exception e) {
+            java.util.Map<String, Object> errorResponse = new java.util.HashMap<>();
+            errorResponse.put("result", "error");
+            errorResponse.put("error", "Failed to parse start_order result");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return errorResponse;
         }
     }
 
