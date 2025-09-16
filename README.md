@@ -1,88 +1,88 @@
 # Conecta Brasil Backend
 
-API backend para o projeto Conecta Brasil, desenvolvida em Java Spring Boot com integração à blockchain Stellar.
+Backend API for the Conecta Brasil project, developed in Java Spring Boot with Stellar blockchain integration.
 
 ## 🚀 Deploy
 
-A aplicação está deployada no Google Cloud Run:
+The application is deployed on Google Cloud Run:
 
-**URL de Produção:** https://conecta-brasil-api-379307696946.us-central1.run.app
+**Production URL:** https://conecta-brasil-api-379307696946.us-central1.run.app
 
-## 📚 Documentação da API
+## 📚 API Documentation
 
 ### Swagger UI
-Acesse a documentação interativa da API:
+Access the interactive API documentation:
 - **Local:** http://localhost:8080/swagger-ui/index.html
-- **Produção:** https://conecta-brasil-api-379307696946.us-central1.run.app/swagger-ui/index.html
+- **Production:** https://conecta-brasil-api-379307696946.us-central1.run.app/swagger-ui/index.html
 
-### Collections Postman
-Importe as collections para testar a API:
-- **Pasta de Collections:** [collection/](./collection/)
-- **Arquivo Principal:** [conecta_brasil_backend.postman_collection.json](./collection/conecta_brasil_backend.postman_collection.json)
+### Postman Collections
+Import the collections to test the API:
+- **Collections Folder:** [collection/](./collection/)
+- **Main File:** [conecta_brasil_backend.postman_collection.json](./collection/conecta_brasil_backend.postman_collection.json)
 
-## 🏗️ Arquitetura do Projeto
+## 🏗️ Project Architecture
 
-### Estrutura de Pastas
+### Folder Structure
 ```
 src/main/java/com/conectabrasil/
 ├── adapter/
-│   └── inboud/rest/          # Controllers REST
+│   └── inboud/rest/          # REST Controllers
 ├── application/
-│   └── usecase/              # Casos de uso da aplicação
-├── config/                   # Configurações do Spring
-├── domain/                   # Entidades de domínio
+│   └── usecase/              # Application use cases
+├── config/                   # Spring configurations
+├── domain/                   # Domain entities
 └── infrastructure/
-    └── stellar/              # Integração com Stellar
+    └── stellar/              # Stellar integration
 ```
 
-### Tecnologias Utilizadas
+### Technologies Used
 - **Java 21**
 - **Spring Boot 3.5.5**
 - **Stellar SDK 2.0.0**
 - **Maven**
 - **Docker**
 
-## 🌟 Funcionalidades
+## 🌟 Features
 
-### Endpoints Principais
+### Main Endpoints
 
-#### Pacotes
-- `GET /packages` - Lista todos os pacotes disponíveis
-- `GET /packages/user/{userAddress}` - Pacotes de um usuário específico
-- `GET /packages/remaining/{ownerAddress}/{orderId}` - Tempo restante de uma ordem
-- `GET /packages/order-session/{ownerAddress}/{orderId}` - Informações da sessão de uma ordem
+#### Packages
+- `GET /packages` - List all available packages
+- `GET /packages/user/{userAddress}` - Packages for a specific user
+- `GET /packages/remaining/{ownerAddress}/{orderId}` - Remaining time for an order
+- `GET /packages/order-session/{ownerAddress}/{orderId}` - Order session information
 
-#### Operações de Ordem
-- `POST /packages/start-order` - Inicia uma ordem
-- `POST /packages/pause-order` - Pausa uma ordem
+#### Order Operations
+- `POST /packages/start-order` - Start an order
+- `POST /packages/pause-order` - Pause an order
 
-### Integração Stellar
+### Stellar Integration
 
-O projeto integra com a blockchain Stellar através do Soroban (smart contracts):
+The project integrates with the Stellar blockchain through Soroban (smart contracts):
 
-- **Rede:** Testnet/Mainnet Stellar
-- **Contratos:** Soroban smart contracts
-- **Operações:** Invocação de funções de contrato
-- **Transações:** Simulação e envio para a rede
+- **Network:** Stellar Testnet/Mainnet
+- **Contracts:** Soroban smart contracts
+- **Operations:** Contract function invocation
+- **Transactions:** Simulation and network submission
 
-## 🛠️ Desenvolvimento Local
+## 🛠️ Local Development
 
-### Pré-requisitos
+### Prerequisites
 - Java 21+
 - Maven 3.9+
-- Docker (opcional)
+- Docker (optional)
 
-### Executando Localmente
+### Running Locally
 
 ```bash
-# Clone o repositório
+# Clone the repository
 git clone <repository-url>
 cd conecta-brasil-backend
 
-# Execute com Maven
+# Run with Maven
 ./mvnw spring-boot:run
 
-# Ou compile e execute o JAR
+# Or compile and run the JAR
 ./mvnw package
 java -jar target/conectabrasil-0.0.1-SNAPSHOT.jar
 ```
@@ -90,88 +90,88 @@ java -jar target/conectabrasil-0.0.1-SNAPSHOT.jar
 ### Docker
 
 ```bash
-# Build da imagem
+# Build the image
 docker build -t conecta-brasil-backend .
 
-# Execute o container
+# Run the container
 docker run -p 8080:8080 conecta-brasil-backend
 ```
 
-## ⚙️ Configuração
+## ⚙️ Configuration
 
-### Variáveis de Ambiente
+### Environment Variables
 
 ```properties
-# Configurações Stellar
+# Stellar configurations
 STELLAR_NETWORK_PASSPHRASE=Test SDF Network ; September 2015
 STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
 STELLAR_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 STELLAR_CONTRACT_ADDRESS=<contract-address>
 
-# Configurações da aplicação
+# Application configurations
 SERVER_PORT=8080
 ```
 
-## 🔧 Regras de Negócio
+## 🔧 Business Rules
 
-### Pacotes
-- Cada pacote possui um ID único e informações específicas
-- Usuários podem ter múltiplos pacotes ativos
-- Pacotes têm estados (ativo/inativo)
+### Packages
+- Each package has a unique ID and specific information
+- Users can have multiple active packages
+- Packages have states (active/inactive)
 
-### Ordens
-- Ordens são identificadas por um ID único (U128)
-- Podem ser iniciadas e pausadas
-- Possuem tempo de sessão controlado
-- Integram com smart contracts Stellar
+### Orders
+- Orders are identified by a unique ID (U128)
+- Can be started and paused
+- Have controlled session time
+- Integrate with Stellar smart contracts
 
-### Transações Stellar
-- Todas as operações são simuladas antes do envio
-- Suporte a authorizations quando necessário
-- Tratamento de erros específicos da rede Stellar
-- Parsing de resultados SCVal para formatos JSON
+### Stellar Transactions
+- All operations are simulated before submission
+- Support for authorizations when necessary
+- Stellar network-specific error handling
+- Parsing of SCVal results to JSON formats
 
-## 🧪 Testes
+## 🧪 Testing
 
 ```bash
-# Execute os testes
+# Run tests
 ./mvnw test
 
-# Execute com relatório de cobertura
+# Run with coverage report
 ./mvnw test jacoco:report
 ```
 
-## 📦 Build e Deploy
+## 📦 Build and Deploy
 
-### Build Local
+### Local Build
 ```bash
 ./mvnw clean package
 ```
 
-### Deploy Docker
+### Docker Deploy
 ```bash
-# Build multi-platform
+# Multi-platform build
 docker buildx build --platform linux/amd64 -t conecta-brasil-backend .
 
-# Push para registry
+# Push to registry
 docker buildx build --platform linux/amd64 -t "$IMAGE" . --push
 ```
 
-## 🤝 Contribuição
+## 🤝 Contributing
 
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-1. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-2. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-3. Push para a branch (`git push origin feature/AmazingFeature`)
-4. Abra um Pull Request
+## 📄 License
 
-## 📄 Licença
+This project is under the MIT license. See the `LICENSE` file for more details.
 
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+## 📞 Contact
 
-## 📞 Contato
-
-Para dúvidas ou suporte, entre em contato através dos canais oficiais do projeto Conecta Brasil.
+For questions or support, contact us through the official Conecta Brasil project channels.
 
 ---
 
@@ -180,4 +180,4 @@ Para dúvidas ou suporte, entre em contato através dos canais oficiais do proje
 - LinkedIn: [Huggo Oliveira](https://www.linkedin.com/in/huggo-oliveira/)
 - GitHub: [Huggo Oliveira](https://github.com/huggo-oliveira)
 
-**Conecta Brasil** - Conectando o Brasil através da tecnologia blockchain Stellar.
+**Conecta Brasil** - Connecting Brazil through Stellar blockchain technology.
