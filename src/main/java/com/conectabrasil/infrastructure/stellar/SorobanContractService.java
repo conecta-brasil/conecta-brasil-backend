@@ -238,6 +238,16 @@ public class SorobanContractService {
         return sc;
     }
 
+    private static SCVal u64(long v) {
+        Uint64 u = new Uint64();
+        u.setUint64(new XdrUnsignedHyperInteger(v));
+
+        SCVal sc = new SCVal();
+        sc.setDiscriminant(SCValType.SCV_U64);
+        sc.setU64(u);
+        return sc;
+    }
+
     /**
      * Invoca a função get_all_packages do contrato Stellar
      * 
@@ -494,6 +504,111 @@ public class SorobanContractService {
 
         } catch (Exception e) {
             throw new RuntimeException("Erro ao fazer parsing do resultado SCVal: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Busca o valor restante de uma ordem específica
+     */
+    public Object getRemainingByOrder(String ownerAddress, long orderId) throws Exception {
+        try {
+            // Cria uma conta temporária para a transação
+            KeyPair keyPair = KeyPair.random();
+            TransactionBuilderAccount account = new TransactionBuilderAccount() {
+                private long sequenceNumber = 0L;
+
+                @Override
+                public String getAccountId() {
+                    return keyPair.getAccountId();
+                }
+
+                @Override
+                public KeyPair getKeyPair() {
+                    return keyPair;
+                }
+
+                @Override
+                public Long getSequenceNumber() {
+                    return sequenceNumber;
+                }
+
+                @Override
+                public Long getIncrementedSequenceNumber() {
+                    return sequenceNumber + 1;
+                }
+
+                @Override
+                public void incrementSequenceNumber() {
+                    sequenceNumber++;
+                }
+
+                @Override
+                public void setSequenceNumber(long sequenceNumber) {
+                    this.sequenceNumber = sequenceNumber;
+                }
+            };
+
+            // Cria os parâmetros da função usando métodos estáticos
+            SCVal ownerParam = new Address(ownerAddress).toSCVal();
+            SCVal orderIdParam = u128Lo(orderId);
+            SCVal nowParam = u64(System.currentTimeMillis() / 1000);
+
+            // Cria a operação de invocação
+            InvokeHostFunctionOperation operation = InvokeHostFunctionOperation.invokeContractFunctionOperationBuilder(
+                    stellarConfig.getContractAddress(),
+                    "remaining_by_order",
+                    java.util.Arrays.asList(ownerParam, orderIdParam, nowParam)).build();
+
+            // Constrói a transação
+            Transaction transaction = new TransactionBuilder(account, network)
+                    .addOperation(operation)
+                    .setTimeout(30)
+                    .setBaseFee(100)
+                    .build();
+
+            // Simula a transação
+            org.stellar.sdk.responses.sorobanrpc.SimulateTransactionResponse response = soroban
+                    .simulateTransaction(transaction);
+
+            if (response.getResults() != null && !response.getResults().isEmpty()) {
+                String xdrResult = response.getResults().get(0).getXdr();
+                return parseRemainingFromSCVal(xdrResult);
+            }
+
+            return 0;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao buscar valor restante da ordem: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Faz o parsing do resultado SCVal para extrair o valor restante
+     */
+    private Object parseRemainingFromSCVal(String xdrResult) throws Exception {
+        try {
+            // Decodifica o XDR base64
+            byte[] xdrBytes = Base64.getDecoder().decode(xdrResult);
+            XdrDataInputStream xdrStream = new XdrDataInputStream(new ByteArrayInputStream(xdrBytes));
+
+            // Lê o SCVal do resultado
+            SCVal resultVal = SCVal.decode(xdrStream);
+
+            // Extrai o valor baseado no tipo
+            Object remainingValue = extractValueFromSCVal(resultVal);
+
+            // Retorna um objeto JSON amigável para o frontend
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("remaining", remainingValue != null ? remainingValue : 0);
+            response.put("timestamp", System.currentTimeMillis());
+            return response;
+
+        } catch (Exception e) {
+            java.util.Map<String, Object> errorResponse = new java.util.HashMap<>();
+            errorResponse.put("remaining", 0);
+            errorResponse.put("error", "Failed to parse remaining value");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return errorResponse;
         }
     }
 
