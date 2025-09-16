@@ -2,10 +2,7 @@ package com.conectabrasil.adapter.inboud.rest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.conectabrasil.application.usecase.GetAllPackagesUseCase;
 import com.conectabrasil.application.usecase.GetAllPackagesUseCase.GetAllPackagesResult;
@@ -68,6 +65,43 @@ public class PackageController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(0);
+        }
+    }
+
+    @PostMapping("/start-order")
+    public ResponseEntity<Object> startOrder(@RequestBody StartOrderRequest request) {
+        try {
+            Object result = sorobanContractService.startOrder(request.getOwnerAddress(), request.getOrderId());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            java.util.Map<String, Object> errorResponse = new java.util.HashMap<>();
+            errorResponse.put("result", "error");
+            errorResponse.put("error", e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse);
+        }
+    }
+
+    // Classe interna para o request body
+    public static class StartOrderRequest {
+        private String ownerAddress;
+        private long orderId;
+
+        public String getOwnerAddress() {
+            return ownerAddress;
+        }
+
+        public void setOwnerAddress(String ownerAddress) {
+            this.ownerAddress = ownerAddress;
+        }
+
+        public long getOrderId() {
+            return orderId;
+        }
+
+        public void setOrderId(long orderId) {
+            this.orderId = orderId;
         }
     }
 }
