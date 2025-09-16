@@ -1,5 +1,6 @@
 package com.conectabrasil.adapter.inboud.rest;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,6 +57,17 @@ public class PackageController {
             return ResponseEntity.ok(userPackages);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Erro ao buscar pacotes do usuário: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/remaining/{ownerAddress}/{orderId}")
+    public ResponseEntity<Object> getRemainingByOrder(@PathVariable String ownerAddress, @PathVariable long orderId) {
+        try {
+            Object remaining = sorobanContractService.getRemainingByOrder(ownerAddress, orderId);
+            return ResponseEntity.ok(remaining);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(0);
         }
     }
 }
